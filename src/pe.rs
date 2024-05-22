@@ -8,6 +8,7 @@ use goblin::pe::{
     section_table::SectionTable,
 };
 use scroll::Pread;
+use scroll_derive::Pread;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::mem::size_of;

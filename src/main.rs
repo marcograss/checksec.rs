@@ -423,10 +423,14 @@ fn parse_bytes(bytes: &[u8], file: &Path) -> Result<Vec<Binary>, ParseError> {
         Object::PE(_) => Err(ParseError::Unimplemented("PE")),
         #[cfg(not(feature = "macho"))]
         Object::Mach(_) => Err(ParseError::Unimplemented("MachO")),
+        #[cfg(not(feature = "pe"))]
+        Object::COFF(_) => Err(ParseError::Unimplemented("COFF")),
         Object::Archive(archive) => Ok(parse_archive(&archive, file, bytes)),
         Object::Unknown(magic) => {
             Err(ParseError::Goblin(Error::BadMagic(magic)))
         }
+        Object::COFF(_) => Err(ParseError::Unimplemented("COFF")),
+        _ => Err(ParseError::Unimplemented("Unknown File Format")),
     }
 }
 
