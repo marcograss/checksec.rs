@@ -158,6 +158,7 @@ pub struct CheckSecResults {
     pub canary: bool,
     /// Clang Control Flow Integrity (*CFLAGS=*`-fsanitize=cfi-*`)
     pub clang_cfi: bool,
+    #[allow(clippy::doc_markdown)]
     /// Clang SafeStack (*CFLAGS=*`-fsanitize=safe-stack`)
     pub clang_safestack: bool,
     /// Stack Clash Protection (*CFLAGS=*`-fstack-clash-protection`)
