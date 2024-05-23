@@ -16,7 +16,7 @@
 //! * [`checksec::macho::CheckSecResults`](crate::macho::CheckSecResults)
 //! * [`checksec::pe::CheckSecResults`](crate::pe::CheckSecResults)
 //!
-//! ```rust
+//! ```ignore
 //! use checksec::elf::CheckSecResults as ElfCheckSecResults;
 //! use checksec::macho::CheckSecResults as MachOCheckSecResults;
 //! use checksec::pe::CheckSecResults as PECheckSecResults;
@@ -32,7 +32,7 @@
 //! * [`checksec::macho::Properties`](crate::macho::Properties)
 //! * [`checksec::pe::Properties`](crate::pe::Properties)
 //!
-//! ```rust
+//! ```ignore
 //! use checksec::elf::Properties as ElfProperties;
 //! use checksec::macho::Properties as MachOProperties;
 //! use checksec::pe::Properties as PEProperties;

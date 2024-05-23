@@ -65,6 +65,26 @@ path = "src/lib.rs"
 name = "checksec"
 path = "src/main.rs"
 
+[[example]]
+name = "elf_has_canary"
+required-features = ["elf"]
+
+[[example]]
+name = "elf_print_checksec_results"
+required-features = ["elf"]
+
+[[example]]
+name = "macho_print_checksec_results"
+required-features = ["macho"]
+
+[[example]]
+name = "pe_has_aslr_gs"
+required-features = ["pe"]
+
+[[example]]
+name = "pe_print_checksec_results"
+required-features = ["pe"]
+
 [features]
 color = ["colored", "colored_json", "xattr"]
 default = ["elf", "macho", "pe", "color", "maps", "disassembly"]
