@@ -25,9 +25,7 @@ use memmap2::Mmap;
 use rayon::iter::ParallelBridge;
 use rayon::prelude::*;
 use serde_json::{json, to_string_pretty};
-use sysinfo::{
-    PidExt, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt,
-};
+use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
 use std::collections::HashMap;
 #[cfg(all(target_os = "linux", feature = "elf"))]
@@ -713,7 +711,7 @@ where
     processes
         .par_bridge()
         .filter_map(|process| {
-            match parse(process.exe(), &mut Some(Arc::clone(&cache))) {
+            match parse(process.exe()?, &mut Some(Arc::clone(&cache))) {
                 Err(err) => {
                     if let ParseError::IO(ref e) = err {
                         if e.kind() == ErrorKind::NotFound
@@ -914,14 +912,23 @@ fn main() {
                     })
                 })
                 .filter(|process| {
-                    if process.exe().is_file() {
+                    if process.exe().is_none() {
+                        eprintln!(
+                            "Executable is none for process {} with ID {}",
+                            process.name(),
+                            process.pid()
+                        );
+                        return false;
+                    }
+                    let process_exe = process.exe().unwrap();
+                    if process_exe.is_file() {
                         true
                     } else {
                         eprintln!(
                 "No valid executable found for process {} with ID {}: {}",
                 process.name(),
                 process.pid(),
-                process.exe().display()
+                process_exe.display()
             );
                         false
                     }
