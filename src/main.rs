@@ -301,8 +301,8 @@ impl From<std::io::Error> for ParseError {
 
 #[cfg(all(target_os = "linux", feature = "elf"))]
 impl From<LdSoError> for ParseError {
-    fn from(err: LdSoError) -> ParseError {
-        ParseError::LdSo(err)
+    fn from(err: LdSoError) -> Self {
+        Self::LdSo(err)
     }
 }
 
@@ -533,18 +533,16 @@ fn parse_dependencies(
     while !to_scan.is_empty() {
         let mut results: Vec<Binary> = to_scan
             .par_iter()
-            .filter_map(|lib| {
-                match parse(lib, &mut cache.as_ref().map(Arc::clone)) {
-                    Ok(bins) => Some(bins),
-                    Err(err) => {
-                        eprintln!(
-                            "Failed to parse {} for {}: {}",
-                            lib.display(),
-                            binary.file.display(),
-                            err
-                        );
-                        None
-                    }
+            .filter_map(|lib| match parse(lib, &mut cache.clone()) {
+                Ok(bins) => Some(bins),
+                Err(err) => {
+                    eprintln!(
+                        "Failed to parse {} for {}: {}",
+                        lib.display(),
+                        binary.file.display(),
+                        err
+                    );
+                    None
                 }
             })
             .flatten()
@@ -640,7 +638,7 @@ fn walk(
 #[cfg(all(feature = "maps", target_os = "linux"))]
 fn parse_process_libraries(
     process: &sysinfo::Process,
-    cache: &mut Option<Cache>,
+    cache: &Option<Cache>,
 ) -> Result<Vec<Binary>, std::io::Error> {
     Ok(Process::parse_maps(process.pid().as_u32() as usize)?
         .into_iter()
@@ -657,7 +655,7 @@ fn parse_process_libraries(
                     match file_name.strip_suffix(" (deleted)") {
                         Some(s) => {
                             let mut pb = PathBuf::from(
-                                p.parent().unwrap_or(Path::new("/")),
+                                p.parent().unwrap_or_else(|| Path::new("/")),
                             );
                             pb.push(s);
                             Either::Left(pb)
@@ -672,7 +670,7 @@ fn parse_process_libraries(
         .unique()
         .par_bridge()
         .filter_map(|p| {
-            parse(&p, &mut cache.as_ref().map(Arc::clone))
+            parse(&p, &mut cache.clone())
                 .map_err(|err| {
                     if let ParseError::IO(ref e) = err {
                         if e.kind() == ErrorKind::NotFound
@@ -698,7 +696,7 @@ fn parse_process_libraries(
 #[cfg(not(all(feature = "maps", target_os = "linux")))]
 fn parse_process_libraries(
     _process: &sysinfo::Process,
-    _cache: &mut Option<Cache>,
+    _cache: &Option<Cache>,
 ) -> Result<Vec<Binary>, std::io::Error> {
     Err(std::io::Error::new(
         ErrorKind::Unsupported,
@@ -743,7 +741,7 @@ where
                                 if scan_dynlibs {
                                     parse_process_libraries(
                                         process,
-                                        &mut Some(Arc::clone(&cache)),
+                                        &Some(Arc::clone(&cache)),
                                     )
                                     .ok()
                                 } else {

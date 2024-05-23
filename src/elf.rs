@@ -631,21 +631,16 @@ impl LibraryLookup {
         runpath: &VecRpath,
         libfilename: &str,
     ) -> Option<PathBuf> {
-        let parentbinpath = if let Some(parent) = binarypath.parent() {
-            parent.to_str()
-        } else {
-            None
-        };
+        let parentbinpath =
+            binarypath.parent().and_then(|parent| parent.to_str());
 
         for rpath in rpath.iter().filter_map(|rpath| match rpath {
             Rpath::YesRW(ref str) | Rpath::Yes(ref str) => Some(str),
             Rpath::None => None,
         }) {
-            let rpath = if let Some(p) = parentbinpath {
+            let rpath = parentbinpath.map_or(Either::Right(rpath), |p| {
                 Either::Left(rpath.replace("$ORIGIN", p))
-            } else {
-                Either::Right(rpath)
-            };
+            });
             let path = Path::new(&rpath).join(libfilename);
             if path.is_file() {
                 return Some(path);
@@ -661,11 +656,9 @@ impl LibraryLookup {
 
             Rpath::None => None,
         }) {
-            let runpath = if let Some(p) = parentbinpath {
+            let runpath = parentbinpath.map_or(Either::Right(runpath), |p| {
                 Either::Left(runpath.replace("$ORIGIN", p))
-            } else {
-                Either::Right(runpath)
-            };
+            });
             let path = Path::new(&runpath).join(libfilename);
             if path.is_file() {
                 return Some(path);

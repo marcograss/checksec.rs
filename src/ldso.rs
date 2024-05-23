@@ -53,7 +53,7 @@ impl fmt::Display for LdSoError {
 
 impl From<io::Error> for LdSoError {
     fn from(e: io::Error) -> Self {
-        LdSoError::IO(e)
+        Self::IO(e)
     }
 }
 
@@ -88,12 +88,10 @@ impl LdSoLookup {
                     let file = file.map_err(|e| {
                         LdSoError::Glob(e, PathBuf::from(include_path))
                     })?;
-                    lookup_paths.append(
-                        &mut LdSoLookup::parse_ldso_conf_file(
-                            &file,
-                            include_depth + 1,
-                        )?,
-                    );
+                    lookup_paths.append(&mut Self::parse_ldso_conf_file(
+                        &file,
+                        include_depth + 1,
+                    )?);
                 }
                 continue;
             }
@@ -119,9 +117,9 @@ impl LdSoLookup {
     /// # Errors
     /// Will fail if the ld.so.conf configuration can not be read or has an
     /// invalid format.
-    pub fn gen_lookup_dirs() -> Result<LdSoLookup, LdSoError> {
-        Ok(LdSoLookup {
-            lookup_dirs: LdSoLookup::parse_ldso_conf_file(
+    pub fn gen_lookup_dirs() -> Result<Self, LdSoError> {
+        Ok(Self {
+            lookup_dirs: Self::parse_ldso_conf_file(
                 Path::new("/etc/ld.so.conf"),
                 0,
             )?,

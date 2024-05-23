@@ -78,7 +78,7 @@ pub struct Region {
 }
 #[cfg(all(feature = "maps", any(target_os = "linux", target_os = "windows")))]
 impl Region {
-    pub fn new(start: usize, end: usize) -> Self {
+    pub const fn new(start: usize, end: usize) -> Self {
         Self { start, end }
     }
 }
@@ -270,10 +270,10 @@ impl fmt::Display for MapEntry {
                     self.region.start, self.region.end, self.flags
                 )
                 .red(),
-                match &self.pathname {
-                    Some(pathname) => pathname.display().to_string().red(),
-                    None => String::new().red(),
-                }
+                self.pathname.as_ref().map_or_else(
+                    || String::new().red(),
+                    |pathname| pathname.display().to_string().red()
+                )
             )
         } else {
             write!(
@@ -282,10 +282,9 @@ impl fmt::Display for MapEntry {
                 self.region.start,
                 self.region.end,
                 self.flags,
-                match &self.pathname {
-                    Some(pathname) => pathname.display().to_string(),
-                    None => String::new(),
-                }
+                self.pathname.as_ref().map_or_else(String::new, |pathname| {
+                    pathname.display().to_string()
+                })
             )
         }
     }
@@ -366,7 +365,7 @@ impl Process {
         binary: Binary,
         libraries: Option<Vec<Binary>>,
     ) -> Self {
-        match Process::parse_maps(pid) {
+        match Self::parse_maps(pid) {
             Ok(maps) => Self { pid, binary, maps: Some(maps), libraries },
             Err(e) => {
                 eprintln!(
