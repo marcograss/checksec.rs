@@ -83,6 +83,7 @@ impl fmt::Display for BinSpecificProperties {
             Self::PE(b) => write!(f, "{b}"),
             #[cfg(feature = "macho")]
             Self::MachO(b) => write!(f, "{b}"),
+            _ => unreachable!("Empty BinSpecificProperties"),
         }
     }
 }

@@ -646,7 +646,11 @@ fn parse_process_libraries(
         .into_iter()
         .filter(|m| m.flags.x)
         .filter_map(|m| m.pathname)
-        .filter(|p| p.is_absolute() && p != process.exe())
+        .filter(|p| {
+            p.is_absolute()
+                && process.exe().is_some()
+                && p != process.exe().unwrap()
+        })
         .map(|p| match p.file_name() {
             Some(file_name) => match file_name.to_str() {
                 Some(file_name) => {
