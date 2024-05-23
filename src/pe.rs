@@ -215,18 +215,16 @@ fn get_load_config_val(
 ) -> Result<ImageLoadConfigDirectory, scroll::Error> {
     let dir_size = size_of::<ImageLoadConfigDirectory>();
     let rva = load_config_hdr.virtual_address as usize;
-    if let Ok(offset) =
-        find_offset(rva, sections, file_alignment, &ParseOptions::default())
-            .ok_or_else(|| {
-                goblin::error::Error::Malformed(
-                    load_config_hdr.virtual_address.to_string(),
-                )
-            })
-    {
-        mem[offset..offset + dir_size].pread(0)
-    } else {
-        Err(scroll::Error::BadOffset(rva))
-    }
+    find_offset(rva, sections, file_alignment, &ParseOptions::default())
+        .ok_or_else(|| {
+            goblin::error::Error::Malformed(
+                load_config_hdr.virtual_address.to_string(),
+            )
+        })
+        .map_or_else(
+            |_| Err(scroll::Error::BadOffset(rva)),
+            |offset| mem[offset..offset + dir_size].pread(0),
+        )
 }
 
 /// Address Space Layout Randomization: `None`, `DYNBASE`, or `HIGHENTROPYVA`
@@ -676,17 +674,13 @@ impl Properties for PE<'_> {
         false
     }
     fn has_seh(&self) -> bool {
-        #[allow(clippy::match_wildcard_for_single_variants)]
-        match self.header.optional_header {
-            Some(optional_header) => {
-                let dllcharacteristics: u16 =
-                    optional_header.windows_fields.dll_characteristics;
-                matches!(
-                    dllcharacteristics & IMAGE_DLLCHARACTERISTICS_NO_SEH,
-                    x if x == 0
-                )
-            }
-            _ => false,
-        }
+        self.header.optional_header.map_or(false, |optional_header| {
+            let dllcharacteristics: u16 =
+                optional_header.windows_fields.dll_characteristics;
+            matches!(
+                dllcharacteristics & IMAGE_DLLCHARACTERISTICS_NO_SEH,
+                x if x == 0
+            )
+        })
     }
 }

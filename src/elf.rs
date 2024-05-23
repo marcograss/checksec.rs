@@ -468,17 +468,23 @@ impl Properties for Elf<'_> {
                         == u64::from(SHF_EXECINSTR | SHF_ALLOC)
             })
             .any(|sh| {
-                if let Some(execbytes) = bytes.get(
-                    usize::try_from(sh.sh_offset).unwrap()
-                        ..usize::try_from(sh.sh_offset + sh.sh_size).unwrap(),
-                ) {
-                    let bitness =
-                        if self.is_64 { Bitness::B64 } else { Bitness::B32 };
+                bytes
+                    .get(
+                        usize::try_from(sh.sh_offset).unwrap()
+                            ..usize::try_from(sh.sh_offset + sh.sh_size)
+                                .unwrap(),
+                    )
+                    .map_or(false, |execbytes| {
+                        let bitness = if self.is_64 {
+                            Bitness::B64
+                        } else {
+                            Bitness::B32
+                        };
 
-                    has_stack_clash_protection(execbytes, bitness, sh.sh_addr)
-                } else {
-                    false
-                }
+                        has_stack_clash_protection(
+                            execbytes, bitness, sh.sh_addr,
+                        )
+                    })
             })
     }
     fn has_fortify(&self) -> bool {

@@ -76,6 +76,7 @@ pub enum BinSpecificProperties {
 }
 impl fmt::Display for BinSpecificProperties {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[allow(unreachable_patterns)]
         match self {
             #[cfg(feature = "elf")]
             Self::Elf(b) => write!(f, "{b}"),
@@ -95,7 +96,7 @@ pub struct Blob {
 }
 
 impl Blob {
-    pub fn new(
+    pub const fn new(
         binarytype: BinType,
         properties: BinSpecificProperties,
     ) -> Self {

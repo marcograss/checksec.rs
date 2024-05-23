@@ -350,7 +350,7 @@ pub struct Process {
 }
 impl Process {
     #[cfg(any(not(feature = "maps"), target_os = "macos"))]
-    pub fn new(
+    pub const fn new(
         pid: usize,
         binary: Binary,
         libraries: Option<Vec<Binary>>,

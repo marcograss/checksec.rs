@@ -2,7 +2,7 @@
 use iced_x86::{Decoder, DecoderOptions, Instruction, Mnemonic};
 
 #[cfg(feature = "disassembly")]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Bitness {
     B64,
     B32,
@@ -11,7 +11,7 @@ pub enum Bitness {
 #[cfg(feature = "disassembly")]
 impl Bitness {
     #[must_use]
-    pub fn as_u32(self) -> u32 {
+    pub const fn as_u32(self) -> u32 {
         match self {
             Self::B64 => 64,
             Self::B32 => 32,

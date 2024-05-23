@@ -73,8 +73,9 @@ fn print_filename(file: &Path) -> ColoredString {
 
 #[cfg(all(feature = "color", not(target_os = "windows")))]
 fn print_filename(file: &Path) -> ColoredString {
-    match std::fs::metadata(file) {
-        Ok(md) => {
+    std::fs::metadata(file).map_or_else(
+        |_| file.display().to_string().bright_blue(),
+        |md| {
             #[cfg(target_os = "linux")]
             fn has_filecaps(file: &Path) -> bool {
                 xattr::get(file, "security.capability")
@@ -82,7 +83,7 @@ fn print_filename(file: &Path) -> ColoredString {
                     .is_some()
             }
             #[cfg(not(target_os = "linux"))]
-            fn has_filecaps(_file: &Path) -> bool {
+            const fn has_filecaps(_file: &Path) -> bool {
                 false
             }
 
@@ -96,9 +97,8 @@ fn print_filename(file: &Path) -> ColoredString {
             } else {
                 file.display().to_string().bright_blue()
             }
-        }
-        Err(_) => file.display().to_string().bright_blue(),
-    }
+        },
+    )
 }
 
 #[cfg(not(feature = "color"))]
@@ -288,14 +288,14 @@ impl fmt::Display for ParseError {
 }
 
 impl From<goblin::error::Error> for ParseError {
-    fn from(err: goblin::error::Error) -> ParseError {
-        ParseError::Goblin(err)
+    fn from(err: goblin::error::Error) -> Self {
+        Self::Goblin(err)
     }
 }
 
 impl From<std::io::Error> for ParseError {
-    fn from(err: std::io::Error) -> ParseError {
-        ParseError::IO(err)
+    fn from(err: std::io::Error) -> Self {
+        Self::IO(err)
     }
 }
 
