@@ -23,7 +23,7 @@ use windows::Win32::{
     Security::AdjustTokenPrivileges,
     System::{
         Diagnostics::{
-            Debug::{GetThreadContext, CONTEXT},
+            Debug::{GetThreadContext, CONTEXT, CONTEXT_FLAGS},
             ToolHelp::{
                 CreateToolhelp32Snapshot, Heap32First, Heap32ListFirst,
                 Heap32ListNext, Heap32Next, Module32FirstW, Module32NextW,
@@ -302,7 +302,7 @@ impl fmt::Display for MapEntry {
                 .red(),
                 match &self.pathname {
                     Some(pathname) => pathname.display().to_string().red(),
-                    None => "".to_string().red(),
+                    None => String::new().red(),
                 },
                 format!("{}", self.etype).red()
             )
@@ -315,7 +315,7 @@ impl fmt::Display for MapEntry {
                 self.flags,
                 match &self.pathname {
                     Some(pathname) => pathname.display().to_string(),
-                    None => "".to_string(),
+                    None => String::new(),
                 },
                 self.etype,
             )
@@ -408,7 +408,7 @@ impl Process {
     fn parse_maps(pid: usize) -> Result<Vec<MapEntry>, Error> {
         let mut maps: Vec<MapEntry> = Vec::new();
         if let Err(e) = set_debug_privilege() {
-            eprintln!("Unable to adjust token privileges. Reason: {}", e);
+            eprintln!("Unable to adjust token privileges. Reason: {e}");
         };
 
         #[allow(clippy::cast_possible_truncation)]
@@ -432,27 +432,28 @@ impl Process {
                 let proc = WinProcInfo::new(pid as u32, hprocess, hsnapshot);
                 if let Err(e) = fetch_modules(&proc, &mut maps) {
                     eprintln!(
-                        "Unable to fetch modules for pid {}. Reason: {}",
-                        pid, e
+                        "Unable to fetch modules for pid {pid}. Reason: {e}"
                     );
                 };
                 if let Err(e) = fetch_stacks(&proc, &mut maps) {
                     eprintln!(
-                        "Unable to fetch stacks for pid {}. Reason: {}",
-                        pid, e
+                        "Unable to fetch stacks for pid {pid}. Reason: {e}"
                     );
                 };
 
                 if let Err(e) = fetch_heaps(&proc, &mut maps) {
                     eprintln!(
-                        "Unable to fetch heaps for pid {}. Reason: {}",
-                        pid, e
+                        "Unable to fetch heaps for pid {pid}. Reason: {e}"
                     );
                 };
 
-                unsafe { CloseHandle(hsnapshot) };
+                unsafe {
+                    let _ = CloseHandle(hsnapshot);
+                };
             }
-            unsafe { CloseHandle(hprocess) };
+            unsafe {
+                let _ = CloseHandle(hprocess);
+            };
         };
 
         if !maps.is_empty() {
@@ -477,56 +478,45 @@ impl Processes {
 #[cfg(all(feature = "maps", target_os = "windows"))]
 fn set_debug_privilege() -> Result<(), Error> {
     let mut htoken = HANDLE::default();
-    if unsafe {
+    unsafe {
         OpenProcessToken(
             GetCurrentProcess(),
             TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
             &mut htoken,
         )
-    }
-    .as_bool()
-    {
-        let mut luid = LUID::default();
-        let wprivstr: Vec<u16> = OsStr::new("SeDebugPrivilege")
-            .encode_wide()
-            .chain(once(0))
-            .collect();
-        if unsafe {
-            LookupPrivilegeValueW(
-                PCWSTR::null(),
-                PCWSTR(wprivstr.as_ptr()),
-                &mut luid,
-            )
-        }
-        .as_bool()
-        {
-            let tkp = TOKEN_PRIVILEGES {
-                PrivilegeCount: 1,
-                Privileges: [LUID_AND_ATTRIBUTES {
-                    Luid: luid,
-                    Attributes: SE_PRIVILEGE_ENABLED,
-                }],
-            };
-            #[allow(clippy::cast_possible_truncation)]
-            if !unsafe {
-                AdjustTokenPrivileges(
-                    htoken,
-                    false,
-                    Some(&tkp),
-                    mem::size_of::<TOKEN_PRIVILEGES>() as u32,
-                    Some(&mut TOKEN_PRIVILEGES::default()),
-                    Some(&mut 0_u32),
-                )
-            }
-            .as_bool()
-            {
-                return Err(Error::last_os_error());
-            }
-        }
-        unsafe { CloseHandle(htoken) };
-    } else {
-        return Err(Error::last_os_error());
-    }
+    }?;
+
+    let mut luid = LUID::default();
+    let wprivstr: Vec<u16> =
+        OsStr::new("SeDebugPrivilege").encode_wide().chain(once(0)).collect();
+    unsafe {
+        LookupPrivilegeValueW(
+            PCWSTR::null(),
+            PCWSTR(wprivstr.as_ptr()),
+            &mut luid,
+        )
+    }?;
+    let tkp = TOKEN_PRIVILEGES {
+        PrivilegeCount: 1,
+        Privileges: [LUID_AND_ATTRIBUTES {
+            Luid: luid,
+            Attributes: SE_PRIVILEGE_ENABLED,
+        }],
+    };
+    unsafe {
+        #[allow(clippy::cast_possible_truncation)]
+        AdjustTokenPrivileges(
+            htoken,
+            false,
+            Some(&tkp),
+            mem::size_of::<TOKEN_PRIVILEGES>() as u32,
+            Some(&mut TOKEN_PRIVILEGES::default()),
+            Some(&mut 0_u32),
+        )
+    }?;
+    unsafe {
+        let _ = CloseHandle(htoken);
+    };
 
     Ok(())
 }
@@ -544,7 +534,7 @@ fn fetch_modules(
     lpme.dwSize = dw_size;
     let mut cur_mod = unsafe { Module32FirstW(proc.hsnapshot, &mut lpme) };
     loop {
-        if !cur_mod.as_bool() {
+        if cur_mod.is_err() {
             break;
         }
 
@@ -598,9 +588,9 @@ fn fetch_heaps(
     let mut lphl = unsafe { mem::zeroed::<HEAPLIST32>() };
     lphl.dwSize = mem::size_of::<HEAPLIST32>();
     let mut cur_heap = unsafe { Heap32ListFirst(proc.hsnapshot, &mut lphl) };
-    if cur_heap.as_bool() {
+    if cur_heap.is_ok() {
         loop {
-            if !cur_heap.as_bool() {
+            if cur_heap.is_err() {
                 break;
             }
 
@@ -628,7 +618,7 @@ fn fetch_heaps(
 
             let mut heap_flags = Vec::<MapFlags>::default();
             loop {
-                if !cur_entry.as_bool() {
+                if cur_entry.is_err() {
                     break;
                 }
 
@@ -685,9 +675,9 @@ fn fetch_stacks(
     let dw_size = mem::size_of::<THREADENTRY32>() as u32;
     lpte.dwSize = dw_size;
     let mut cur_thread = unsafe { Thread32First(proc.hsnapshot, &mut lpte) };
-    if cur_thread.as_bool() {
+    if cur_thread.is_ok() {
         loop {
-            if !cur_thread.as_bool() {
+            if cur_thread.is_err() {
                 break;
             }
             if lpte.th32OwnerProcessID == proc.pid {
@@ -706,54 +696,46 @@ fn fetch_stacks(
                         }
                     }
                     let mut lpcontext = unsafe { mem::zeroed::<CONTEXT>() };
-                    lpcontext.ContextFlags = 1_u32; // CONTEXT_CONTROL
-                    let thread_ctx =
-                        unsafe { GetThreadContext(hthread, &mut lpcontext) };
-                    if thread_ctx.as_bool() {
-                        let mut lpbuffer = unsafe {
-                            mem::zeroed::<MEMORY_BASIC_INFORMATION>()
-                        };
-                        #[cfg(target_arch = "x86_64")]
-                        let sp = lpcontext.Rsp;
-                        #[cfg(target_arch = "x86")]
-                        let sp = lpcontext.Esp;
-                        #[cfg(target_arch = "aarch64")]
-                        let sp = lpcontext.Sp;
+                    lpcontext.ContextFlags = CONTEXT_FLAGS(1); // CONTEXT_CONTROL
+                    unsafe { GetThreadContext(hthread, &mut lpcontext) }?;
+                    let mut lpbuffer =
+                        unsafe { mem::zeroed::<MEMORY_BASIC_INFORMATION>() };
+                    #[cfg(target_arch = "x86_64")]
+                    let sp = lpcontext.Rsp;
+                    #[cfg(target_arch = "x86")]
+                    let sp = lpcontext.Esp;
+                    #[cfg(target_arch = "aarch64")]
+                    let sp = lpcontext.Sp;
 
-                        let _ = unsafe {
-                            VirtualQueryEx(
-                                proc.hprocess,
-                                Some(sp as *const c_void),
-                                &mut lpbuffer,
-                                mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-                            )
-                        };
+                    let _ = unsafe {
+                        VirtualQueryEx(
+                            proc.hprocess,
+                            Some(sp as *const c_void),
+                            &mut lpbuffer,
+                            mem::size_of::<MEMORY_BASIC_INFORMATION>(),
+                        )
+                    };
 
-                        let region = Region::new(
-                            lpbuffer.AllocationBase as usize,
-                            lpbuffer.AllocationBase as usize
-                                + lpbuffer.RegionSize,
-                        );
+                    let region = Region::new(
+                        lpbuffer.AllocationBase as usize,
+                        lpbuffer.AllocationBase as usize + lpbuffer.RegionSize,
+                    );
 
-                        let flags = MapFlags::new(lpbuffer.Protect);
+                    let flags = MapFlags::new(lpbuffer.Protect);
 
-                        maps.push(MapEntry {
-                            region,
-                            flags,
-                            pathname: None,
-                            etype: MapType::Stack,
-                        });
+                    maps.push(MapEntry {
+                        region,
+                        flags,
+                        pathname: None,
+                        etype: MapType::Stack,
+                    });
 
-                        if unsafe { GetCurrentThreadId() } != lpte.th32ThreadID
-                        {
-                            unsafe {
-                                ResumeThread(hthread);
-                            }
+                    if unsafe { GetCurrentThreadId() } != lpte.th32ThreadID {
+                        unsafe {
+                            ResumeThread(hthread);
                         }
-                        entries += 1_u32;
-                    } else {
-                        return Err(Error::last_os_error());
                     }
+                    entries += 1_u32;
                 } else {
                     return Err(Error::last_os_error());
                 }
