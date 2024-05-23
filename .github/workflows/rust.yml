@@ -1,0 +1,25 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: taiki-e/install-action@cargo-hack
+    - name: Cargo hack build
+      run: cargo hack --each-feature build --verbose
+    - name: Cargo hack test
+      run: cargo clean && cargo hack --each-feature test --verbose
+    - name: Clippy Pedantic and others
+      run: cargo clippy --all-targets --all-features -- -D clippy::nursery -D clippy::all -D clippy::pedantic
